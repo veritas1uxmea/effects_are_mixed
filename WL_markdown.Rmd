@@ -1,0 +1,142 @@
+---
+title: "Mixed effects analysis"
+author: "Won Lee"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,fig.width=4, fig.height=3)
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+#libraries
+library(tidyverse) # I only speak tidyverse 
+library(lme4)
+library(lmerTest)
+```
+
+These data show `n=60` mice of both sexes. They are from 12 different litters. Their litter/dam id `dam_id` is given as well as two measures of their dam's behavior - licking/grooming `dam_lg` and nursing `dam_nurse`.  The weaning weight of each individual is given `wean_wt` as well as three measures of behavior `of_inner`, `freezing` & `sociability`, and two brain measures `protein1`, `protein2`.
+
+The animals have two grouping variables also.  An `early` treatment which they could either be in the  `control` or `stress` group, and a `post` treatment, which they could either be in the `control` or `treatment` groups.
+
+
+## Explore the data further 
+```{r}
+str(df)
+summary(df) 
+
+# notice dam_id and id should be set as factor, not integer variables.
+df <- df %>% 
+  mutate_at(vars('id','dam_id'),factor)
+```
+
+```{r}
+table(df$early,df$post)
+table(df$early,df$dam_id)
+table(df$post,df$dam_id)
+table(df$sex,df$dam_id)
+```
+```{r, fig.width=10}
+df %>% 
+  gather(y_variables,value,of_inner, freezing, sociability, protein1, protein2) %>% 
+  ggplot(aes(x = value))+
+  geom_density(alpha = 0.2, size = 1.1)+
+  facet_wrap(~y_variables, nrow = 1, scales = "free")+ # free both x and y axis 
+  theme_bw() 
+```
+
+```{r, fig.height=5,fig.width=10}
+df %>% 
+  gather(y_variables, value, of_inner, freezing, sociability, protein1, protein2) %>% 
+  ggplot(aes(post,value, color = early, fill = early))+
+  geom_boxplot(alpha = 0.2, outlier.colour = NA)+
+  geom_point(shape = 21, alpha = 0.5, position =  position_dodge(0.75))+
+  facet_wrap(~y_variables, nrow = 1, scales = "free_y")+
+  theme_bw()
+
+```
+## Mixed effect model 
+- build model
+- check model fit
+- interpret it 
+
+your_model <- lmer(y_variable ~ x_variable + (1|random_intercept), data = your_data)
+```{r}
+mod1 <- lmer(freezing ~ early + post + (1|dam_id), data = df, REML = FALSE)
+summary(mod1)
+
+```
+
+
+```{r}
+mod2 <- lmer(freezing ~ early  + (1|dam_id), data = df)
+summary(mod2)
+
+```
+
+
+```{r}
+mod3 <- lmer(freezing ~  post + (1|dam_id), data = df)
+summary(mod3)
+
+```
+
+
+
+Want to make things complicated? 
+In real experiment examples, 
+```{r, fig.width=10}
+df %>% 
+  gather(y_variables, value, of_inner, freezing, sociability, protein1, protein2) %>% 
+  ggplot(aes(post,value, color = interaction(early,sex), fill = interaction(early,sex)))+
+  geom_boxplot(alpha = 0.2, outlier.colour = NA)+
+  geom_point(shape = 21, alpha = 0.5, position =  position_dodge(0.75))+
+  facet_wrap(~y_variables, nrow = 1, scales = "free_y")+
+  theme_bw()
+
+```
+
+
+#### Continuous predictor variables
+NOt so good example 
+```{r, fig.width=10}
+df %>% 
+  gather(y_variables, value, of_inner, freezing, sociability, protein1, protein2) %>% 
+  ggplot(aes(dam_lg,value))+
+  geom_point(shape = 21, alpha = 0.5)+
+  geom_smooth(method = "lm")+
+  facet_wrap(~y_variables, nrow = 1, scales = "free_y")+
+  theme_bw()
+```
+
+
+
+```{r, fig.width=10}
+df %>% 
+  gather(y_variables, value, of_inner, freezing, sociability, protein1, protein2) %>% 
+  ggplot(aes(dam_nurse,value))+
+  geom_point(shape = 21, alpha = 0.5)+
+  geom_smooth(method = "lm")+
+  facet_wrap(~y_variables, nrow = 1, scales = "free_y")+
+  theme_bw()
+
+```
+
+
+
+
+#### colinearity 
+```{r}
+df %>% 
+  ggplot(aes(dam_lg,dam_nurse,label = dam_id, color = early))+
+  geom_text()+
+  theme_bw()
+```
+
+
+## some tips 
+- extract coefficient 
+
+- multiple comparison: to correct or not to correct??... (Gelman, Hill, Yajima. 2012.)
+http://www.stat.columbia.edu/~gelman/research/published/multiple2f.pdf 
+
