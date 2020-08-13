@@ -5,6 +5,7 @@ output: html_document
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,fig.width=4, fig.height=3)
+theme_set(theme_bw()) # set global ggplot theme 
 ```
 
 
@@ -13,6 +14,7 @@ knitr::opts_chunk$set(echo = TRUE,fig.width=4, fig.height=3)
 library(tidyverse) # I only speak tidyverse 
 library(lme4)
 library(lmerTest)
+library(RColorBrewer)
 ```
 
 These data show `n=60` mice of both sexes. They are from 12 different litters. Their litter/dam id `dam_id` is given as well as two measures of their dam's behavior - licking/grooming `dam_lg` and nursing `dam_nurse`.  The weaning weight of each individual is given `wean_wt` as well as three measures of behavior `of_inner`, `freezing` & `sociability`, and two brain measures `protein1`, `protein2`.
@@ -22,12 +24,15 @@ The animals have two grouping variables also.  An `early` treatment which they c
 
 ## Explore the data further 
 ```{r}
+df <- readRDS("df.RDS")
+
 str(df)
-summary(df) 
+summary(dfx) 
 
 # notice dam_id and id should be set as factor, not integer variables.
 df <- df %>% 
-  mutate_at(vars('id','dam_id'),factor)
+  mutate_at(vars('id','dam_id'),factor) 
+
 ```
 
 ```{r}
@@ -36,13 +41,20 @@ table(df$early,df$dam_id)
 table(df$post,df$dam_id)
 table(df$sex,df$dam_id)
 ```
+
+```{r}
+df %>% 
+  gather(x_variables, factors, dam_id, sex, early, post)
+```
+
+
 ```{r, fig.width=10}
 df %>% 
   gather(y_variables,value,of_inner, freezing, sociability, protein1, protein2) %>% 
   ggplot(aes(x = value))+
   geom_density(alpha = 0.2, size = 1.1)+
-  facet_wrap(~y_variables, nrow = 1, scales = "free")+ # free both x and y axis 
-  theme_bw() 
+  facet_wrap(~y_variables, nrow = 1, scales = "free") # free both x and y axis 
+  
 ```
 
 ```{r, fig.height=5,fig.width=10}
@@ -51,10 +63,30 @@ df %>%
   ggplot(aes(post,value, color = early, fill = early))+
   geom_boxplot(alpha = 0.2, outlier.colour = NA)+
   geom_point(shape = 21, alpha = 0.5, position =  position_dodge(0.75))+
-  facet_wrap(~y_variables, nrow = 1, scales = "free_y")+
+  facet_wrap(~y_variables, nrow = 1, scales = "free_y")
+```
+
+```{r}
+df %>% 
+  gather(y_variables, value, of_inner, freezing, sociability, protein1, protein2) %>% 
+  group_by(y_variables, dam_id) %>% 
+  summarize_if(is.numeric,var)
+```
+
+
+```{r, fig.width=10}
+df %>% 
+  mutate(dam_id = as.numeric(as.character(dam_id))) %>% 
+  gather(y_variables, value, of_inner, freezing, sociability, protein1, protein2) %>% 
+  ggplot(aes(dam_id,value, color = early, fill = early))+
+  geom_point(shape = 21, alpha = 0.5, position =  position_dodge(0.75))+
+  facet_wrap(~y_variables, nrow = 2, scales = "free_y")+
+  scale_x_continuous(breaks =  c(1:12))+
   theme_bw()
 
 ```
+
+
 ## Mixed effect model 
 - build model
 - check model fit
@@ -62,6 +94,10 @@ df %>%
 
 your_model <- lmer(y_variable ~ x_variable + (1|random_intercept), data = your_data)
 ```{r}
+
+mod0 <- lmer(freezing ~ dam_id + (1|sex), data = df, REML = FALSE)
+summary(mod0)
+
 mod1 <- lmer(freezing ~ early + post + (1|dam_id), data = df, REML = FALSE)
 summary(mod1)
 
@@ -76,8 +112,16 @@ summary(mod2)
 
 
 ```{r}
+
+df %>% 
+  ggplot(aes(dam_id, freezing))+
+  geom_point()
+var(as.character(df$dam_id))
+var(df$dam_id)
+
 mod3 <- lmer(freezing ~  post + (1|dam_id), data = df)
 summary(mod3)
+?isSingular
 
 ```
 
